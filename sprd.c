@@ -47,7 +47,25 @@ int main () {
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
 
-    // Sleep forever
+    /* TODO: initialize reservation struct with the following fields:
+     *          busy - int; a non-zero value means the port has already been
+     *                  securely 'bound' to by another process
+     *          uids - array of ints representing a set of user ids
+     *          gids - array of ints representing a set of group ids
+     */
+
+    /* TODO: initialize hash table (GHashTable from GLib?) that will be used to
+     *          store port reservations
+     */
+
+    /* TODO: read from config file and for each port reservation listed:
+     *          1. bind to port
+     *          2. store listed uids and gids in a reservation struct
+     *          3. insert entry into hash table with port number as key and
+     *              reservation struct as value
+     */
+
+    // TODO: infinite loop listening on FIFO for secure bind/close requests
     while(1)
         sleep(60);
 
