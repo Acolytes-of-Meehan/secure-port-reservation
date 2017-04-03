@@ -15,3 +15,4 @@ clean :
 	rm -f sender
 	rm -f requester
 	rm -f uds
+	rm -f *.o

@@ -33,8 +33,8 @@ __BEGIN_DECLS
 
 #define _GNU_SOURCE
 
-int secureBind __P((int portNum, char *udsName));
-int secureClose __P((int portNum));
+int secure_bind __P((int portNum, char *udsName));
+int secure_close __P((int udsSock, int tcpSock));
 
 __END_DECLS
 
