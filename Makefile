@@ -12,7 +12,4 @@ requester : requesterVCSocketPermissionsTest.o
 	$(cc) -c -g $<
 
 clean :
-	rm -f sender
-	rm -f requester
-	rm -f uds
-	rm -f *.o
+	$(RM) sender , requester , uds , *.o , *.gch , *~ , *#
