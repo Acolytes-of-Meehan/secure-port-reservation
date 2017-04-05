@@ -1,5 +1,5 @@
 /* Benjamin Ellerby
- * Ray Luow
+ * Ray Luo
  * Evan Ricks
  * Oliver Smith-Denny
  * spr.h, header file for Portcullis, the Secure Port Reservation (SPR) Daemon
