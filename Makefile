@@ -1,15 +1,20 @@
 cc = gcc
+cflags = -Wall
 
-all : sender requester
+all : secure_bind
 
-sender : senderVCSocketPermissionsTest.o
-	$(cc) -o $@ $<
+secure_bind : secure_bind.o
 
-requester : requesterVCSocketPermissionsTest.o
-	$(cc) -o $@ $<
+secure_bindTest : daemonSecureBindTest requester
+
+daemonSecureBindTest : daemonSecureBindTest.o
+	$(cc) $(cflags) -o $@ $<
+
+requester : requester.o secure_bind.o 
+	$(cc) $(cflags) -o $@ $< secure_bind.o
 
 %.o : %.c
-	$(cc) -c -g $<
+	$(cc) $(cflags) -c -g $<
 
 clean :
-	$(RM) sender , requester , uds , *.o , *.gch , *~ , *#
+	$(RM) daemonSecureBindTest, requester, *.o , *.gch , *~ , *#

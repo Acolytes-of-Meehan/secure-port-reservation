@@ -33,7 +33,6 @@ __BEGIN_DECLS
 
 #define _GNU_SOURCE
 
-<<<<<<< HEAD
 typedef struct sprFDSocks {
 
   int recvSock;
@@ -43,11 +42,7 @@ typedef struct sprFDSocks {
 } sprFDSet;
 
 int secureBind __P((int portNum, char *udsName));
-int secureClose __P((int udsSock, int reservedSock));
-=======
-int secure_bind __P((int portNum, char *udsName));
-int secure_close __P((int udsSock, int tcpSock));
->>>>>>> 21a64b4e489bfbadcc5a51172859684a3f091999
+int secureClose __P((int udsSock, int tcpSock));
 
 __END_DECLS
 

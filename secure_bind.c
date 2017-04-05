@@ -4,8 +4,8 @@
  * Evan Ricks
  * Oliver Smith-Denny
  * secure_bind.c function to receive a reserved port from Portcullis, the Secure Port Reservation Daemon
- * On success, returns a struct containing the file descriptor numbers of the received file descriptor and the unix domain socket 
- * On failure returns NULL
+ * On success, returns a 0, returnSet is filled out with relevant information 
+ * On failure returns EXIT_FAILURE, implementation dependent, return set is NULL
  *
  */
 
@@ -29,7 +29,7 @@
 
 extern errno;
 
-sprFDSet * secure_bind(int portNum, char *udsPath){
+int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
   int recvFD, udsConnectSock, udsListenSock, localLen, remoteLen, flag;
   struct sockaddr_un local, remote;
@@ -38,38 +38,41 @@ sprFDSet * secure_bind(int portNum, char *udsPath){
   char portBuf[PORT_DIGITS];
   /* Begin BSD incompatible */
   char cDataBuf[CMSG_SPACE(sizeof(struct ucred))];
-  struct ucred *daemonCredentials;
+  struct ucred dCred;
+  struct ucred *daemonCredentials = &dCred;
   /* End BSD incompatible */
-  sprFDSet returnSet;
   
   if(portNum < PORT_MIN || portNum > PORT_MAX) {
     errno = EINVAL;
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   if(strlen(udsPath) >= PATH_MAX) {
     errno = ENAMETOOLONG;
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   memset(&local, 0, sizeof(local));
   memset(&remote, 0, sizeof(remote));
   memset(&daemonPermissions, 0, sizeof(daemonPermissions));
   memset(cDataBuf, 0, sizeof(cDataBuf));
-  memset(daemonCredentials, 0, sizeof(daemonCredentials));
+  memset((void *)daemonCredentials, 0, sizeof(*daemonCredentials));
   memset(portBuf, 0, sizeof(portBuf));
-  memset(returnSet, 0, sizeof(returnSet));
+  memset((void *)returnSet, 0, sizeof(*returnSet));
 
-  if((uds = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
-    return NULL;
+  if((udsListenSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
+    return EXIT_FAILURE;
 
   local.sun_family = AF_UNIX;
   strncpy(local.sun_path, udsPath, PATH_MAX);
   unlink(local.sun_path);
   localLen = sizeof(local);
 
+  if((bind(udsListenSock, (struct sockaddr *)&local, localLen)) < 0)
+    return EXIT_FAILURE;
+
   if((listen(udsListenSock, QLEN)) < 0)
-    return NULL;
+    return EXIT_FAILURE;
 
   /* TODO: Write the pathname of the UDS Sock to the Daemon's named FIFO */
 
@@ -79,17 +82,17 @@ sprFDSet * secure_bind(int portNum, char *udsPath){
   strncpy(remote.sun_path, udsPath, PATH_MAX);
   remoteLen = sizeof(remote);
 
-  if((udsConnectSock = accept(udsListenSock, (struct sockaddr *)&remote, &remoteLen)) < 0) {
+  if((udsConnectSock = accept(udsListenSock, (struct sockaddr *)&remote, (socklen_t *)&remoteLen)) < 0) {
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   flag = 1;
   if((setsockopt(udsConnectSock, SOL_SOCKET, SO_PASSCRED, &flag, sizeof(flag))) < 0) {
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   daemonPermissions.msg_control = cDataBuf;
@@ -98,16 +101,16 @@ sprFDSet * secure_bind(int portNum, char *udsPath){
   if((recvmsg(udsConnectSock, &daemonPermissions, MSG_WAITALL)) < 0) {
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   daemonControl = CMSG_FIRSTHDR(&daemonPermissions);
 
-  if(daemonControl == NULL || daemonControl-<cmsg_type != SCM_CREDENTIALS) {
+  if(daemonControl == NULL || daemonControl->cmsg_type != SCM_CREDENTIALS) {
     errno = ENOMSG;
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   /* Begin BSD incompatible */
@@ -133,7 +136,7 @@ sprFDSet * secure_bind(int portNum, char *udsPath){
   if((send(udsConnectSock, portBuf, sizeof(portBuf), 0)) < 0) {
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   /* Remove SO_PASSCRED from connected socket, no longer needed */
@@ -142,7 +145,7 @@ sprFDSet * secure_bind(int portNum, char *udsPath){
   if((setsockopt(udsConnectSock, SOL_SOCKET, SO_PASSCRED, &flag, sizeof(flag))) < 0) {
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   /* Receive (recvmsg) the file descriptor or null from the Daemon */
@@ -150,7 +153,7 @@ sprFDSet * secure_bind(int portNum, char *udsPath){
   if((recvmsg(udsConnectSock, &recvFDMsg, MSG_WAITALL)) < 0) {
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   recvFDControl = CMSG_FIRSTHDR(&recvFDMsg);
@@ -160,17 +163,17 @@ sprFDSet * secure_bind(int portNum, char *udsPath){
   if(recvFDControl == NULL || recvFDControl->cmsg_type != SCM_RIGHTS) {
     close(udsListenSock);
     close(udsConnectSock);
-    return NULL;
+    return EXIT_FAILURE;
   }
 
   /* Else, return the received file descriptor (recvFD) */
 
   memcpy(&recvFD, CMSG_DATA(recvFDControl), sizeof(recvFD));
 
-  returnSet.recvSock = recvFD;
-  returnSet.udsListen = udsListenSock;
-  returnSet.udsConnect = udsConnectSock;
+  returnSet->recvSock = recvFD;
+  returnSet->udsListen = udsListenSock;
+  returnSet->udsConnect = udsConnectSock;
     
-  return returnSet;
+  return EXIT_SUCCESS;
   
 }
