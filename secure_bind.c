@@ -1,6 +1,6 @@
 /*
  * Benjamin Ellerby
- * Ray Luow
+ * Ray Luo
  * Evan Ricks
  * Oliver Smith-Denny
  * secure_bind.c function to receive a reserved port from Portcullis, the Secure Port Reservation Daemon
