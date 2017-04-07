@@ -18,7 +18,7 @@ int main(){
   char *udsPath = "/home/smithdo/CS493/secure-port-reservation/myUDS";
   sprFDSet mySet;
 
-  if((secure_bind(portNum, udsPath, &mySet)) != 0) {
+  if((secure_bind(portNum, udsPath, &mySet)) < 0) {
     fprintf(stderr, "Gee willickers, that's not good. Errno: %d\n", errno);
     exit(EXIT_FAILURE);
   }
