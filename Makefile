@@ -1,7 +1,6 @@
 cc = gcc
 cflags = -Wall
 execs = daemonSecureBindTest requester myUDS
-
 all : secure_bindTest
 
 secure_bindTest : daemonSecureBindTest requester

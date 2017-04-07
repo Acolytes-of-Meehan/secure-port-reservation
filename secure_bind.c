@@ -1,8 +1,10 @@
-/*
+/* secure_bind.c
+ *
  * Benjamin Ellerby
  * Ray Luo
  * Evan Ricks
  * Oliver Smith-Denny
+ *
  * secure_bind.c function to receive a reserved port from Portcullis, the Secure Port Reservation Daemon
  * On success, returns a 0, returnSet is filled out with relevant information 
  * On failure returns -1, returnSet is not defined
