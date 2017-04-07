@@ -11,7 +11,7 @@
  *
  */
 
-/* NOTE: May need to overload secure_bind(int portNum, sprFDSet *fds */
+/* NOTE: May need to overload secure_bind(int portNum, sprFDSet *fds) */
 
 #include "spr.h"
 #include <sys/socket.h>
