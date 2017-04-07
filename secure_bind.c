@@ -27,8 +27,6 @@
 #define PORT_DIGITS 6
 #define QLEN 5
 
-extern errno;
-
 int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
   int recvFD, udsConnectSock, udsListenSock, localLen, remoteLen, flag;
@@ -64,7 +62,7 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
     return EXIT_FAILURE;
 
   local.sun_family = AF_UNIX;
-  strncpy(local.sun_path, udsPath, PATH_MAX);
+  strncpy(local.sun_path, udsPath, strlen(udsPath));
   unlink(local.sun_path);
   localLen = sizeof(local);
 
@@ -79,7 +77,7 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
   /* Receive credentials from the Daemon and verify them (recvmsg) */
 
   remote.sun_family = AF_UNIX;
-  strncpy(remote.sun_path, udsPath, PATH_MAX);
+  strncpy(remote.sun_path, udsPath, strlen(udsPath));
   remoteLen = sizeof(remote);
 
   if((udsConnectSock = accept(udsListenSock, (struct sockaddr *)&remote, (socklen_t *)&remoteLen)) < 0) {
@@ -173,6 +171,8 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
   returnSet->recvSock = recvFD;
   returnSet->udsListen = udsListenSock;
   returnSet->udsConnect = udsConnectSock;
+
+  fprintf(stdout, "%d, %d, %d\n", recvFD, udsListenSock, udsConnectSock);
     
   return EXIT_SUCCESS;
   

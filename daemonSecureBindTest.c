@@ -10,17 +10,28 @@
 #include <sys/un.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <unistd.h>
+#include <errno.h>
 
 int main() {
 
+  printf("My credentials are:\npid: %ld\nuid: %ld\ngid: %ld\n", (long)getpid(), (long)getuid(), (long)getgid());
+
   int fd = socket(AF_INET, SOCK_STREAM, 0);
+
+  int flagger = 1;
+
+  if((setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &flagger, sizeof(flagger))) < 0){
+    fprintf(stderr, "reuse error\n");
+    exit(EXIT_FAILURE);
+  }
 
   struct sockaddr_in sockInfo;
   sockInfo.sin_family = AF_INET;
   sockInfo.sin_port = htons(46799);
 
   if((bind(fd, (struct sockaddr *)&sockInfo, sizeof(sockInfo))) < 0) {
-    fprintf(stderr, "first sock bind err\n");
+    fprintf(stderr, "first sock bind err, errno: %d\n", errno);
     exit(EXIT_FAILURE);
   }
 
@@ -47,14 +58,13 @@ int main() {
   meBuf[5] = 'n';
   meBuf[6] = 0;
   
-  if((send(sendSock, meBuf, sizeof(meBuf), 0)) < 0) {
+  if((send(sendSock, meBuf, 7, 0)) < 0) {
     fprintf(stderr, "first send failed\n");
     exit(EXIT_FAILURE);
   }
 
   struct msghdr credMsg;
   memset(&credMsg, 0, sizeof(credMsg));
-  struct cmsghdr *cData;
   char cDataBuf[CMSG_SPACE(sizeof(struct ucred))];
   memset(cDataBuf, 0, sizeof(cDataBuf));
   credMsg.msg_control = cDataBuf;
@@ -65,6 +75,11 @@ int main() {
   int junk = 6;
   inData.iov_base = &junk;
   inData.iov_len = sizeof(int);
+
+  if((setsockopt(sendSock, SOL_SOCKET, SO_PASSCRED, &flagger, sizeof(flagger))) < 0){
+    fprintf(stderr, "second set sock fail\n");
+    exit(EXIT_FAILURE);
+  }
 
   if((recvmsg(sendSock, &credMsg, MSG_WAITALL)) < 0) {
     fprintf(stderr, "recvmsg error\n");
@@ -82,6 +97,13 @@ int main() {
 
   realCred = (struct ucred *)CMSG_DATA(passCred);
   printf("Received Credentials were:\npid: %ld\nuid: %ld\ngid: %ld\n", (long)realCred->pid, (long)realCred->uid, (long)realCred->gid);
+
+  flagger = 0;
+
+  if((setsockopt(sendSock, SOL_SOCKET, SO_PASSCRED, &flagger, sizeof(flagger))) < 0){
+    fprintf(stderr, "third set sock fail\n");
+    exit(EXIT_FAILURE);
+  }
 
   struct msghdr msg;
   struct iovec data;
