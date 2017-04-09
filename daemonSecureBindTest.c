@@ -27,6 +27,7 @@ int main() {
   }
 
   struct sockaddr_in sockInfo;
+  memset(&sockInfo, 0, sizeof(sockInfo));
   sockInfo.sin_family = AF_INET;
   sockInfo.sin_port = htons(46799);
 
@@ -49,19 +50,12 @@ int main() {
     exit(EXIT_FAILURE);
   }
 
-  char meBuf[7];
-  meBuf[0] = 'd';
-  meBuf[1] = 'a';
-  meBuf[2] = 'e';
-  meBuf[3] = 'm';
-  meBuf[4] = '0';
-  meBuf[5] = 'n';
-  meBuf[6] = 0;
+  char junk1 = 'a';
   
-  if((send(sendSock, meBuf, 7, 0)) < 0) {
+  if((send(sendSock, &junk1, 1, 0)) < 0) {
     fprintf(stderr, "first send failed\n");
     exit(EXIT_FAILURE);
-  }
+    }
 
   struct msghdr credMsg;
   memset(&credMsg, 0, sizeof(credMsg));
@@ -72,16 +66,17 @@ int main() {
   struct iovec inData;
   credMsg.msg_iov = &inData;
   credMsg.msg_iovlen = 1;
-  int junk = 6;
+  char junk[6];
+  memset(junk, 0, 6);
   inData.iov_base = &junk;
-  inData.iov_len = sizeof(int);
+  inData.iov_len = sizeof(junk);
 
   if((setsockopt(sendSock, SOL_SOCKET, SO_PASSCRED, &flagger, sizeof(flagger))) < 0){
     fprintf(stderr, "second set sock fail\n");
     exit(EXIT_FAILURE);
   }
 
-  if((recvmsg(sendSock, &credMsg, MSG_WAITALL)) < 0) {
+  if((recvmsg(sendSock, &credMsg, 0)) < 0) {
     fprintf(stderr, "recvmsg error\n");
     exit(EXIT_FAILURE);
   }
@@ -103,11 +98,11 @@ int main() {
   if((setsockopt(sendSock, SOL_SOCKET, SO_PASSCRED, &flagger, sizeof(flagger))) < 0){
     fprintf(stderr, "third set sock fail\n");
     exit(EXIT_FAILURE);
-  }
+    }
 
   struct msghdr msg;
   struct iovec data;
-  int tempData = 5;
+  char tempData = '5';
   
   memset(&msg, 0, sizeof(msg));
   struct cmsghdr *cmsg;
@@ -124,7 +119,7 @@ int main() {
   msg.msg_iov = &data;
   msg.msg_iovlen = 1;
   data.iov_base = &tempData;
-  data.iov_len = sizeof(int);
+  data.iov_len = sizeof(tempData);
   
   if((sendmsg(sendSock, &msg, 0)) < 0) {
     fprintf(stderr, "Could not send\n");

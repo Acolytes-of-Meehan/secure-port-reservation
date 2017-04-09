@@ -37,7 +37,8 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
   struct sockaddr_un local, remote;
   struct msghdr daemonPermissions, recvFDMsg;
   struct cmsghdr *daemonControl, *recvFDControl;
-  char portBuf[PORT_DIGITS];
+  struct iovec junkData, fdJunk;
+  char cmsgbuf[CMSG_SPACE(sizeof(int))], portBuf[PORT_DIGITS], junkBase, fdBase;
   /* Begin BSD incompatible */
   char cDataBuf[CMSG_SPACE(sizeof(struct ucred))];
   struct ucred dCred;
@@ -54,13 +55,26 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
     return RETURN_FAILURE;
   }
 
-  memset(&local, 0, sizeof(local));
-  memset(&remote, 0, sizeof(remote));
-  memset(&daemonPermissions, 0, sizeof(daemonPermissions));
-  memset(cDataBuf, 0, sizeof(cDataBuf));
+  memset((void *)&local, 0, sizeof(local));
+  memset((void *)&remote, 0, sizeof(remote));
+  memset((void *)&daemonPermissions, 0, sizeof(daemonPermissions));
+  memset((void *)cDataBuf, 0, sizeof(cDataBuf));
   memset((void *)daemonCredentials, 0, sizeof(*daemonCredentials));
-  memset(portBuf, 0, sizeof(portBuf));
+  memset((void *)portBuf, 0, sizeof(portBuf));
   memset((void *)returnSet, 0, sizeof(*returnSet));
+  memset((void *)&recvFDMsg, 0, sizeof(recvFDMsg));
+  memset((void *)cmsgbuf, 0, sizeof(cmsgbuf));
+  memset((void *)&junkData, 0, sizeof(junkData));
+  memset((void *)&fdJunk, 0, sizeof(fdJunk));
+
+  fdBase = '3';
+
+  recvFDMsg.msg_control = cmsgbuf;
+  recvFDMsg.msg_controllen = sizeof(cmsgbuf);
+  recvFDMsg.msg_iov = &fdJunk;
+  recvFDMsg.msg_iovlen = 1;
+  fdJunk.iov_base = &fdBase;
+  fdJunk.iov_len = sizeof(fdBase);
 
   if((udsListenSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
     return RETURN_FAILURE;
@@ -99,6 +113,11 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
   daemonPermissions.msg_control = cDataBuf;
   daemonPermissions.msg_controllen = sizeof(cDataBuf);
+  daemonPermissions.msg_iov = &junkData;
+  daemonPermissions.msg_iovlen = 1;
+  junkBase = 'a';
+  junkData.iov_base = &junkBase;
+  junkData.iov_len = sizeof(junkBase);
 
   if((recvmsg(udsConnectSock, &daemonPermissions, MSG_WAITALL)) < 0) {
     close(udsListenSock);
@@ -175,8 +194,6 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
   returnSet->recvSock = recvFD;
   returnSet->udsListen = udsListenSock;
   returnSet->udsConnect = udsConnectSock;
-
-  fprintf(stdout, "%d, %d, %d\n", recvFD, udsListenSock, udsConnectSock);
     
   return RETURN_SUCCESS;
   
