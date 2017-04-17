@@ -1,9 +1,9 @@
 /* sprd.c
- * 
+ *
  * Ben Ellerby
  * Ray Weiming Luo
  * Evan Ricks
- * Oliver Smith-Denny 
+ * Oliver Smith-Denny
  *
  */
 
@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <linux/limits.h>
 #include <string.h>
+#include <syslog.h>
 
 int handleNewConnection (int namedFifo, fd_set *active_fdset);
 int handleExistingConnection (int uds, char *portBuf);
@@ -39,11 +40,14 @@ int main () {
   pid = fork();
 
   if (pid < 0) {
+    // TODO: do we need this perror?
     perror("fork failed");
+    // TODO: should this be a LOG_CRIT or LOG_ERR?
+    syslog(LOG_MAKEPRI(LOG_DAEMON, LOG_CRIT), "Unable to fork daemon child process");
     exit(EXIT_FAILURE);
   }
 
-  if (pid < 0) {
+  if (pid > 0) {
     // Parent received a valid PID; exit parent process
     exit(EXIT_SUCCESS);
   }
@@ -53,18 +57,21 @@ int main () {
   // Change the file mode mask
   umask(0);
 
-  // TODO: open log file(s) here
+  // Open syslog socket and set facility to LOG_DAEMON for future syslogs
+  openlog("sprd", 0, LOG_DAEMON);
 
   // Create a new SID for the child process
   sid = setsid();
   if (sid < 0) {
-    // TODO: log failure
+    // TODO: should this be a LOG_CRIT or LOG_ERR?
+    syslog(LOG_CRIT, "Unable to run daemon child process in a new session");
     exit(EXIT_FAILURE);
   }
 
   // Change the current working directory to root
   if (chdir("/") < 0) {
-    // TODO: log failure
+    // TODO: should this be a LOG_CRIT or LOG_ERR?
+    syslog(LOG_CRIT, "Unable to change daemon process's current working directory to '/'");
     exit(EXIT_FAILURE);
   }
 
@@ -123,7 +130,7 @@ int main () {
 	      /* This is the case of secure_bind */
 	      handleExistingConnection(i, portBuf);
 	    }
-		  
+
 	  }
 	}
       } else {
@@ -169,7 +176,7 @@ int handleExistingConnection (int uds, char *portBuf) {
   }
 
   passCred = CMSG_FIRSTHDR(&credMsg);
-  
+
   if(passCred == NULL || passCred->cmsg_type != SCM_CREDENTIALS){
     //TODO: log error, did not receive credentials
     return RETURN_FAILURE;
@@ -185,7 +192,7 @@ int handleExistingConnection (int uds, char *portBuf) {
   }
 
   //TODO: check data structure, pass fd if ok, otherwise don't pass
-  
+
   return RETURN_SUCCESS;
 
 }
@@ -198,10 +205,10 @@ int handleNewConnection (int namedFifo, fd_set *active_fdset) {
   char sendChar = 'd';
   struct sockaddr_un remote;
   int len, connectSock;
-    
+
   memset(readBuf, 0, sizeof(readBuf));
   memset(remote, 0, sizeof(remote));
-  
+
   if((read(namedFifo, readBuf, PATH_MAX)) == 0) {
     //TODO: log error, read nothing from fifo
     return RETURN_FAILURE;
