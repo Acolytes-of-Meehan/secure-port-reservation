@@ -17,7 +17,7 @@ gcc -c -g spr.h
 for i in *.c
 do
     echo $i
-    gcc -c -g $i
+    gcc -c -g -Wall $i
 done
 
 echo "compile done"

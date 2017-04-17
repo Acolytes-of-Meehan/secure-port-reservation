@@ -17,13 +17,5 @@
 #include <unistd.h>
 
 int secure_close (int recvSock, int udsListen, int udsConnect) {
-    if ((close(udsConnect)) < 0) { 
-        return -1;
-    }
-
-    if ((close(udsListen)) < 0) {
-        return -1;
-    }
-
-    return close(recvSock);
+    return (close(udsConnect) | close(udsListen) | close(recvSock));
 }

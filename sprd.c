@@ -30,7 +30,7 @@ int handleExistingConnection (int uds, char *portBuf);
 
 int main () {
 
-  int uds, i;
+  int uds, i, namedFifo;
   pid_t pid, sid;
   fd_set active_fdset, read_fdset;
   char portBuf[PORT_DIGIT_MAX + 1];
@@ -81,8 +81,15 @@ int main () {
   // TODO: create named fifo and add to active_fdset
 
   /* !!!!! TEMPORARY, for compilation purposes, change as you will !!!!! */
-
-  int namedFifo = 6;
+  // Unlink named fifo
+  // NOTE: Check ernno from unlick() for possible return errors
+  unlink("~/tmp/spr_fifo");
+ 
+  // Use chmod(2) for:
+  // WRITE: S_IWUSR (for current testing only), S_IWOTH and S_IWGRP
+  // READ: S_IRUSR
+  // TODO: Change to O_RDONLY after testing
+  namedFifo = open("~/tmp/spr_fifo", O_RDWR);
 
   // TODO: infinite loop listening on FIFO for secure bind/close requests
   while(1) {
@@ -107,6 +114,11 @@ int main () {
 	      break;
 	    } else if (strlen(portBuf) == 0) {
 	      /* This is the case of secure_close, i can be shutdown and FD_CLR'ed from active_fdset */
+            if (shutdown(i, SHUT_RDWR) < 0) {
+                //TODO: log failure
+            }
+
+            FD_CLR(i, &active_fdset);
 	    } else {
 	      /* This is the case of secure_bind */
 	      handleExistingConnection(i, portBuf);
@@ -119,7 +131,6 @@ int main () {
       }
     }
   }
-
 }
 
 /* Function to handle a request on a unix domain socket, return 0 on success, -1 on failure */
@@ -218,5 +229,4 @@ int handleNewConnection (int namedFifo, fd_set *active_fdset) {
   FD_SET(active_fdset, connectSock);
 
   return RETURN_SUCCESS;
-
 }
