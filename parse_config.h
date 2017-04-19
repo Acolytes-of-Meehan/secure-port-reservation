@@ -15,4 +15,4 @@ typedef struct res {
 
 int is_in_range(range_node* node, int val);
 
-int parse_config(char* path, res* reservations);
+res* parse_config(char* path);
