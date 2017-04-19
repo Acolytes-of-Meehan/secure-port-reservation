@@ -1,5 +1,5 @@
 /* Benjamin Ellerby
- * Ray Luow
+ * Ray Luo
  * Evan Ricks
  * Oliver Smith-Denny
  * spr.h, header file for Portcullis, the Secure Port Reservation (SPR) Daemon
@@ -33,8 +33,16 @@ __BEGIN_DECLS
 
 #define _GNU_SOURCE
 
-int secureBind __P((int portNum, char *udsName));
-int secureClose __P((int portNum));
+typedef struct sprFDSocks {
+
+  int recvSock;
+  int udsListen;
+  int udsConnect;
+
+} sprFDSet;
+
+int secure_bind __P((int portNum, char *udsName, sprFDSet *returnSet));
+int secure_close __P((int recvSock, int udsListen, int udsConnect));
 
 __END_DECLS
 
