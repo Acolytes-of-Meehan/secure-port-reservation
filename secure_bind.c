@@ -23,6 +23,7 @@
 #include <linux/limits.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h>
 
 #define PORT_MIN 0
 #define PORT_MAX 65535
@@ -30,10 +31,11 @@
 #define QLEN 5
 #define RETURN_FAILURE -1
 #define RETURN_SUCCESS 0
+#define NAMED_FIFO "~/tmp/spr_fifo"
 
 int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
-  int recvFD, udsConnectSock, udsListenSock, localLen, remoteLen, flag;
+  int recvFD, udsConnectSock, udsListenSock, localLen, remoteLen, flag, fifo;
   struct sockaddr_un local, remote;
   struct msghdr daemonPermissions, recvFDMsg;
   struct cmsghdr *daemonControl, *recvFDControl;
@@ -90,7 +92,15 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
   if((listen(udsListenSock, QLEN)) < 0)
     return RETURN_FAILURE;
 
-  /* TODO: Write the pathname of the UDS Sock to the Daemon's named FIFO */
+  /* Write the pathname of the UDS Sock to the Daemon's named FIFO */
+
+  if((fifo = open(NAMED_FIFO, O_WRONLY)) < 0) {
+    return RETURN_FAILURE;
+  }
+
+  if((write(fifo, udsPath, strlen(udsPath))) < strlen(udsPath)) {
+    return RETURN_FAILURE;
+  }
 
   /* Receive credentials from the Daemon and verify them (recvmsg) */
 
@@ -138,7 +148,7 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
   daemonCredentials = (struct ucred *)CMSG_DATA(daemonControl);
 
-  /* TODO: If it is not Daemon process, drop connection, goto line 74 (just kidding), exit or loop back */
+  /* TODO: If it is not Daemon process, drop connection, goto line 87 (or current except line) (just kidding), return or loop back */
 
   /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 

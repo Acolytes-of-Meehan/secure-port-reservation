@@ -8,9 +8,7 @@
  */
 
 #define _GNU_SOURCE
-#define RETURN_SUCCESS 0
-#define RETURN_FAILURE -1
-#define PORT_DIGIT_MAX 5
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -25,6 +23,11 @@
 #include <linux/limits.h>
 #include <string.h>
 #include <syslog.h>
+
+#define RETURN_SUCCESS 0
+#define RETURN_FAILURE -1
+#define PORT_DIGIT_MAX 5
+#define NAMED_FIFO "~/tmp/spr_fifo"
 
 int handleNewConnection (int namedFifo, fd_set *active_fdset);
 int handleExistingConnection (int uds, char *portBuf);
@@ -85,18 +88,18 @@ int main () {
 
   // TODO: parse through config file to generate a linked list of reservations
 
-  // TODO: create named fifo and add to active_fdset
-
-  /* !!!!! TEMPORARY, for compilation purposes, change as you will !!!!! */
   // Unlink named fifo
-  // NOTE: Check ernno from unlick() for possible return errors
-  unlink("~/tmp/spr_fifo");
+  // NOTE: Check ernno from unlink() for possible return errors
+  
+  unlink(NAMED_FIFO);
  
   // Use chmod(2) for:
   // WRITE: S_IWUSR (for current testing only), S_IWOTH and S_IWGRP
   // READ: S_IRUSR
   // TODO: Change to O_RDONLY after testing
-  namedFifo = open("~/tmp/spr_fifo", O_RDWR);
+  if((namedFifo = mkfifo(NAMED_FIFO, S_IRUSR | S_IWUSR | S_IWGRP | S_IWOTH)) < 0) {
+    //TODO: LOG Failure
+  }
 
   // TODO: infinite loop listening on FIFO for secure bind/close requests
   while(1) {
