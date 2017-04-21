@@ -91,7 +91,11 @@ int main () {
   // Unlink named fifo
   // NOTE: Check ernno from unlink() for possible return errors
   
-  unlink(NAMED_FIFO);
+  if (unlink(NAMED_FIFO) < 0) {
+    if (errno != ENOENT) {
+        //TODO: log failure
+    }
+  }
  
   // Use chmod(2) for:
   // WRITE: S_IWUSR (for current testing only), S_IWOTH and S_IWGRP

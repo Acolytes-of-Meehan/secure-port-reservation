@@ -83,7 +83,13 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
   local.sun_family = AF_UNIX;
   strncpy(local.sun_path, udsPath, strlen(udsPath));
-  unlink(local.sun_path);
+
+  if (unlink(local.sun_path) < 0) {
+    if (errno != ENOENT) {
+        return RETURN_FAILURE;
+    }
+  }
+
   localLen = sizeof(local);
 
   if((bind(udsListenSock, (struct sockaddr *)&local, localLen)) < 0)
