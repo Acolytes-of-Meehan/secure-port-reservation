@@ -173,19 +173,19 @@ int handleExistingConnection (int uds, char *portBuf) {
   inData.iov_len = sizeof(portBuf);
 
   if((setsockopt(uds, SOL_SOCKET, SO_PASSCRED, &flag, sizeof(flag))) < 0){
-    //TODO: log error, setsockopt error
+    syslog(LOG_ERR, "Could not set SO_PASSCRED on unix domain socket options");
     return RETURN_FAILURE;
   }
 
   if((recvmsg(uds, &credMsg, 0)) < 0){
-    //TODO: log error, recvmsg fail
+    syslog(LOG_ERR, "Could not receive message from requester");
     return RETURN_FAILURE;
   }
 
   passCred = CMSG_FIRSTHDR(&credMsg);
 
   if(passCred == NULL || passCred->cmsg_type != SCM_CREDENTIALS){
-    //TODO: log error, did not receive credentials
+    syslog(LOG_WARNING, "Did not receive credentials from requester");
     return RETURN_FAILURE;
   }
 
@@ -194,7 +194,7 @@ int handleExistingConnection (int uds, char *portBuf) {
   flag = 0;
 
   if((setsockopt(uds, SOL_SOCKET, SO_PASSCRED, &flag, sizeof(flag))) < 0){
-    //TODO: log error, setsockopt error
+    syslog(LOG_WARNING, "Could not take SO_PASSCRED off unix domain socket options");
     exit(EXIT_FAILURE);
   }
 
@@ -217,12 +217,12 @@ int handleNewConnection (int namedFifo, fd_set *active_fdset) {
   memset(remote, 0, sizeof(remote));
 
   if((read(namedFifo, readBuf, PATH_MAX)) == 0) {
-    //TODO: log error, read nothing from fifo
+    syslog(LOG_NOTICE, "No data read from named FIFO"); 
     return RETURN_FAILURE;
   }
 
   if((sendSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-    //TODO: log error, socket call failed
+    syslog(LOG_CRIT, "Could not open a unix domain socket");
     return RETURN_FAILURE;
   }
   remote.sun_family = AF_UNIX;
@@ -230,12 +230,12 @@ int handleNewConnection (int namedFifo, fd_set *active_fdset) {
   len = sizeof(remote);
 
   if((connect(connectSock, (struct sockaddr *)&remote, len)) < 0) {
-    //TODO: log error, connect failed
+    syslog(LOG_WARNING, "Could not connect to requested unix domain socket");
     return RETURN_FAILURE;
   }
 
   if((send(connectSock, &sendChar, sizeof(sendChar), 0)) < 0) {
-    //TODO: log error, could not send
+    syslog(LOG_ERR, "Could not send credentials across unix domain socket");
     return RETURN_FAILURE;
   }
 
