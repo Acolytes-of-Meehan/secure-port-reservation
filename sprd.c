@@ -23,6 +23,7 @@
 #include <linux/limits.h>
 #include <string.h>
 #include <syslog.h>
+#include "parse_config.h"
 
 #define RETURN_SUCCESS 0
 #define RETURN_FAILURE -1
@@ -84,7 +85,8 @@ int main () {
   close(STDOUT_FILENO);
   //close(STDERR_FILENO);
 
-  // TODO: parse through config file to generate a linked list of reservations
+  // Parse config file to generate a linked list of reservations
+  res* r = parse_config("sprd.conf");
 
   // Unlink named fifo
   if (unlink(NAMED_FIFO) < 0) {
@@ -92,7 +94,7 @@ int main () {
         syslog(LOG_NOTICE, "Unable to unlink the named fifo '%s'", NAMED_FIFO);
     }
   }
- 
+
   // Use chmod(2) for:
   // WRITE: S_IWUSR (for current testing only), S_IWOTH and S_IWGRP
   // READ: S_IRUSR
@@ -211,7 +213,7 @@ int handleNewConnection (int namedFifo, fd_set *active_fdset) {
   memset(remote, 0, sizeof(remote));
 
   if((read(namedFifo, readBuf, PATH_MAX)) == 0) {
-    syslog(LOG_NOTICE, "No data read from named FIFO"); 
+    syslog(LOG_NOTICE, "No data read from named FIFO");
     return RETURN_FAILURE;
   }
 
