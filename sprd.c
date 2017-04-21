@@ -66,14 +66,12 @@ int main () {
   // Create a new SID for the child process
   sid = setsid();
   if (sid < 0) {
-    // TODO: should this be a LOG_CRIT or LOG_ERR?
     syslog(LOG_CRIT, "Unable to run daemon child process in a new session");
     exit(EXIT_FAILURE);
   }
 
   // Change the current working directory to root
   if (chdir("/") < 0) {
-    // TODO: should this be a LOG_CRIT or LOG_ERR?
     syslog(LOG_CRIT, "Unable to change daemon process's current working directory to '/'");
     exit(EXIT_FAILURE);
   }
@@ -89,11 +87,9 @@ int main () {
   // TODO: parse through config file to generate a linked list of reservations
 
   // Unlink named fifo
-  // NOTE: Check ernno from unlink() for possible return errors
-  
   if (unlink(NAMED_FIFO) < 0) {
     if (errno != ENOENT) {
-        //TODO: log failure
+        syslog(LOG_NOTICE, "Unable to unlink the named fifo '%s'", NAMED_FIFO);
     }
   }
  
@@ -102,12 +98,11 @@ int main () {
   // READ: S_IRUSR
   // TODO: Change to O_RDONLY after testing
   if((namedFifo = mkfifo(NAMED_FIFO, S_IRUSR | S_IWUSR | S_IWGRP | S_IWOTH)) < 0) {
-    //TODO: LOG Failure
+    syslog(LOG_CRIT, "Failed to make the named fifo '%s'", NAMED_FIFO);
+    exit(EXIT_FAILURE);
   }
 
-  // TODO: infinite loop listening on FIFO for secure bind/close requests
   while(1) {
-    sleep(30);
     // TODO: Get uds socket then FD_SET the uds socket into the active_fset
     read_fdset = active_fdset;
     if (select (FD_SETSIZE, &read_fdset, NULL, NULL, NULL) == 0) {
@@ -124,12 +119,12 @@ int main () {
 	    fprintf(stderr, "SELECT: %d", uds); //test
 	    memset(portBuf, 0, sizeof(portBuf));
 	    if ((recv(i, portBuf, PORT_DIGIT_MAX, MSG_PEEK)) < 0) {
-	      //TODO: log error, recv failure
+          syslog(LOG_ERR, "Failed to recieve data from file descriptor %d", i);
 	      break;
 	    } else if (strlen(portBuf) == 0) {
 	      /* This is the case of secure_close, i can be shutdown and FD_CLR'ed from active_fdset */
             if (shutdown(i, SHUT_RDWR) < 0) {
-                //TODO: log failure
+                syslog(LOG_CRIT, "Failed to shut down the file descriptot %d", i);
             }
 
             FD_CLR(i, &active_fdset);
@@ -137,14 +132,13 @@ int main () {
 	      /* This is the case of secure_bind */
 	      handleExistingConnection(i, portBuf);
 	    }
-
 	  }
 	}
-      } else {
-	// TODO: log failure
+      }
+    } else {
+        syslog(LOG_INFO, "Failed to select a file descriptor from the read_fdset");
       }
     }
-  }
 }
 
 /* Function to handle a request on a unix domain socket, return 0 on success, -1 on failure */
