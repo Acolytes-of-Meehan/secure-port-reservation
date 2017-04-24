@@ -35,7 +35,7 @@ int handleExistingConnection (int uds, char *portBuf);
 
 int main () {
 
-  int uds, i, namedFifo;
+  int i, namedFifo;
   pid_t pid, sid;
   fd_set active_fdset, read_fdset;
   char portBuf[PORT_DIGIT_MAX + 1];
@@ -86,6 +86,7 @@ int main () {
   //close(STDERR_FILENO);
 
   // Parse config file to generate a linked list of reservations
+  // IMPORTANT: change this path to point to root
   res* r = parse_config("sprd.conf");
 
   // Unlink named fifo
@@ -109,38 +110,37 @@ int main () {
     read_fdset = active_fdset;
     if (select (FD_SETSIZE, &read_fdset, NULL, NULL, NULL) == 0) {
       for (i = 0; i < FD_SETSIZE; i++) {
-	if (FD_ISSET(i, &read_fdset)) {
-	  switch (i) {
-	  case namedFifo :
-	    /* run secure_bind interface, read uds name from named fifo, try to connect to that uds */
-	    handleNewConnection(namedFifo, &active_fdset);
-	    break;
-	    /* This is the case where it is not the named fifo, so it is one of possibly many ud sockets */
-	    /* Need to check what was sent across, if 0, shutdown connection and FD_CLR, if not 0, then they have sent credentials/port request */
-	  default :
-	    fprintf(stderr, "SELECT: %d", uds); //test
-	    memset(portBuf, 0, sizeof(portBuf));
-	    if ((recv(i, portBuf, PORT_DIGIT_MAX, MSG_PEEK)) < 0) {
-          syslog(LOG_ERR, "Failed to recieve data from file descriptor %d", i);
-	      break;
-	    } else if (strlen(portBuf) == 0) {
-	      /* This is the case of secure_close, i can be shutdown and FD_CLR'ed from active_fdset */
-            if (shutdown(i, SHUT_RDWR) < 0) {
-                syslog(LOG_CRIT, "Failed to shut down the file descriptot %d", i);
-            }
+	    if (FD_ISSET(i, &read_fdset)) {
+          if (i == namedFifo) {
+	        /* run secure_bind interface, read uds name from named fifo, try to connect to that uds */
+	        handleNewConnection(namedFifo, &active_fdset);
+	        /* This is the case where it is not the named fifo, so it is one of possibly many ud sockets */
+	        /* Need to check what was sent across, if 0, shutdown connection and FD_CLR, if not 0, then they have sent credentials/port request */
+          } else {
+	        //fprintf(stderr, "SELECT: %d", uds); //test Ray -- can we delete this?
+	        memset(portBuf, 0, sizeof(portBuf));
+	        if ((recv(i, portBuf, PORT_DIGIT_MAX, MSG_PEEK)) < 0) {
+              syslog(LOG_ERR, "Failed to recieve data from file descriptor %d", i);
+	          break;
+	        } else if (strlen(portBuf) == 0) {
+	          /* This is the case of secure_close, i can be shutdown and FD_CLR'ed from active_fdset */
+                if (shutdown(i, SHUT_RDWR) < 0) {
+                    syslog(LOG_CRIT, "Failed to shut down the file descriptot %d", i);
+                }
 
-            FD_CLR(i, &active_fdset);
-	    } else {
-	      /* This is the case of secure_bind */
-	      handleExistingConnection(i, portBuf);
+                FD_CLR(i, &active_fdset);
+	        } else {
+	          /* This is the case of secure_bind */
+	          handleExistingConnection(i, portBuf);
+	        }
+
+          }
 	    }
 	  }
-	}
-      }
     } else {
         syslog(LOG_INFO, "Failed to select a file descriptor from the read_fdset");
-      }
     }
+  }
 }
 
 /* Function to handle a request on a unix domain socket, return 0 on success, -1 on failure */
@@ -156,10 +156,10 @@ int handleExistingConnection (int uds, char *portBuf) {
   struct iovec inData;
   int flag = 1;
 
-  memset(credMsg, 0, sizeof(credMsg));
+  memset(&credMsg, 0, sizeof(credMsg));
   memset(cDataBuf, 0, sizeof(cDataBuf));
-  memset(inData, 0, sizeof(inData));
-  memset(portBuf, 0, sizeof(portBuf));
+  memset(&inData, 0, sizeof(inData));
+  memset(portBuf, 0, PORT_DIGIT_MAX + 1);
 
   credMsg.msg_control = cDataBuf;
   credMsg.msg_controllen = sizeof(cDataBuf);
@@ -210,14 +210,14 @@ int handleNewConnection (int namedFifo, fd_set *active_fdset) {
   int len, connectSock;
 
   memset(readBuf, 0, sizeof(readBuf));
-  memset(remote, 0, sizeof(remote));
+  memset(&remote, 0, sizeof(remote));
 
   if((read(namedFifo, readBuf, PATH_MAX)) == 0) {
     syslog(LOG_NOTICE, "No data read from named FIFO");
     return RETURN_FAILURE;
   }
 
-  if((sendSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+  if((connectSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
     syslog(LOG_CRIT, "Could not open a unix domain socket");
     return RETURN_FAILURE;
   }
@@ -236,7 +236,7 @@ int handleNewConnection (int namedFifo, fd_set *active_fdset) {
   }
 
   /* Add to active_fdset to monitor */
-  FD_SET(active_fdset, connectSock);
+  FD_SET(connectSock, active_fdset);
 
   return RETURN_SUCCESS;
 }

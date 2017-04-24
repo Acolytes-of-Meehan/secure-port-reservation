@@ -1,18 +1,13 @@
 cc = gcc
 cflags = -Wall
-execs = daemonSecureBindTest requester myUDS parse_config
-all : parse_config
+execs = myUDS sprd
+all : daemon
 
-secure_bindTest : daemonSecureBindTest requester
+daemon : sprd.o parse_config.o
+	gcc sprd.o parse_config.o tokenizer.o -o sprd
 
-parse_config : parse_config.c
-	gcc parse_config.h parse_config.c tokenizer.c tokenizer.h -o parse_config
-
-daemonSecureBindTest : daemonSecureBindTest.o
-	$(cc) $(cflags) -o $@ $<
-
-requester : requester.o secure_bind.o
-	$(cc) $(cflags) -o $@ $< secure_bind.o
+parse_config.o : parse_config.c
+	gcc parse_config.c tokenizer.c -c #-o parse_config
 
 %.o : %.c
 	$(cc) $(cflags) -c -g $<

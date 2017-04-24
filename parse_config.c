@@ -133,6 +133,7 @@ res* parse_config(char* path) {
     return head;
 }
 
+/*
 int main() {
     res* r = parse_config("sprd.conf");
     while (r != NULL) {
@@ -156,4 +157,4 @@ int main() {
         r = r->next;
     }
     return 0;
-}
+}*/
