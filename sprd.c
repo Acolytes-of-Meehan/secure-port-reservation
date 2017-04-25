@@ -29,6 +29,7 @@
 #define RETURN_FAILURE -1
 #define PORT_DIGIT_MAX 5
 #define NAMED_FIFO "~/tmp/spr_fifo"
+#define CONFIG_FILE "sprd.conf"
 
 int handleNewConnection (int namedFifo, fd_set *active_fdset);
 int handleExistingConnection (int uds, char *portBuf);
@@ -87,7 +88,7 @@ int main () {
 
   // Parse config file to generate a linked list of reservations
   // IMPORTANT: change this path to point to root
-  res* r = parse_config("sprd.conf");
+  res* r = parse_config(CONFIG_FILE);
 
   // Unlink named fifo
   if (unlink(NAMED_FIFO) < 0) {
@@ -125,13 +126,18 @@ int main () {
 	        } else if (strlen(portBuf) == 0) {
 	          /* This is the case of secure_close, i can be shutdown and FD_CLR'ed from active_fdset */
                 if (shutdown(i, SHUT_RDWR) < 0) {
-                    syslog(LOG_CRIT, "Failed to shut down the file descriptot %d", i);
+                    syslog(LOG_CRIT, "Failed to shut down the file descriptor %d", i);
                 }
 
                 FD_CLR(i, &active_fdset);
 	        } else {
 	          /* This is the case of secure_bind */
-	          handleExistingConnection(i, portBuf);
+	          if((handleExistingConnection(i, portBuf)) < 0) {
+		    FD_CLR(i, &active_fdset);
+		    if((close(i)) < 0) {
+		      syslog(LOG_CRIT, "Failed to shut down the file descriptor %d", i);
+		    }
+		  }
 	        }
 
           }
@@ -147,14 +153,16 @@ int main () {
 
 int handleExistingConnection (int uds, char *portBuf) {
 
-  struct msghdr credMsg;
-  struct cmsghdr *passCred;
+  struct msghdr credMsg, fdMsg;
+  struct cmsghdr *passCred, *cmsg;
   /* Begin BSD incompatible */
-  char cDataBuf[CMSG_SPACE(sizeof(struct ucred))];
+  char cDataBuf[CMSG_SPACE(sizeof(struct ucred))], cmsgbuf[CMSG_SPACE(sizeof(int))];
   struct ucred *realCred;
   /* End BSD incompatible */
-  struct iovec inData;
+  struct iovec inData, tempData;
+  int passFDData = 1;
   int flag = 1;
+  int fd = 0;
 
   memset(&credMsg, 0, sizeof(credMsg));
   memset(cDataBuf, 0, sizeof(cDataBuf));
@@ -191,10 +199,45 @@ int handleExistingConnection (int uds, char *portBuf) {
 
   if((setsockopt(uds, SOL_SOCKET, SO_PASSCRED, &flag, sizeof(flag))) < 0){
     syslog(LOG_WARNING, "Could not take SO_PASSCRED off unix domain socket options");
-    exit(EXIT_FAILURE);
+    return RETURN_FAILURE;
   }
 
-  //TODO: check data structure, pass fd if ok, otherwise don't pass
+  //TODO: check data structure add in if statements below
+
+  /* Credentials match and port open */
+
+  memset(&fdMsg, 0, sizeof(fdMsg));
+  memset(cmsgbuf, 0, sizeof(cmsgbuf));
+  fdMsg.msg_control = cmsgbuf;
+  fdMsg.msg_controllen = sizeof(cmsgbuf);
+  cmsg = CMSG_FIRSTHDR(&fdMsg);
+  cmsg->cmsg_level = SOL_SOCKET;
+  cmsg->cmsg_type = SCM_RIGHTS;
+  cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+  memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
+  fdMsg.msg_controllen = cmsg->cmsg_len;
+  fdMsg.msg_iov = &tempData;
+  fdMsg.msg_iovlen = 1;
+  tempData.iov_base = &passFDData;
+  tempData.iov_len = sizeof(int);
+
+  if((sendmsg(uds, &fdMsg, 0)) < 0) {
+    syslog(LOG_CRIT, "Could not send socket");
+    return RETURN_FAILURE;
+  }
+
+  syslog(LOG_INFO, "Passed socket with port %d to uid: %ld gid: %ld", atoi(portBuf), (long)realCred->uid, (long)realCred->gid); 
+
+  /* Credentials match and port not open */
+
+  syslog(LOG_INFO, "Port %d already in use", atoi(portBuf));
+  return RETURN_FAILURE;
+
+  /* Credentials do not match */
+
+  syslog(LOG_NOTICE, "Port %d not authorized for user uid: %ld gid: %ld", atoi(portBuf), (long)realCred->uid, (long)realCred->gid);
+  return RETURN_FAILURE;
+  
 
   return RETURN_SUCCESS;
 
