@@ -28,6 +28,7 @@
 #define RETURN_SUCCESS 0
 #define RETURN_FAILURE -1
 #define PORT_DIGIT_MAX 5
+#define NUM_PORTS 65536
 #define NAMED_FIFO "~/tmp/spr_fifo"
 #define CONFIG_FILE "sprd.conf"
 
@@ -36,10 +37,12 @@ int handleExistingConnection (int uds, char *portBuf);
 
 int main () {
 
-  int i, namedFifo;
+  int i, namedFifo, fd;
   pid_t pid, sid;
   fd_set active_fdset, read_fdset;
   char portBuf[PORT_DIGIT_MAX + 1];
+  int sockList[NUM_PORTS][2]; // sockList[portNum][0] --> inUse, sockList[portNum][1] --> fd for socket
+  res* r;
 
   // Fork off of the parent process
   pid = fork();
@@ -87,8 +90,64 @@ int main () {
   //close(STDERR_FILENO);
 
   // Parse config file to generate a linked list of reservations
-  // IMPORTANT: change this path to point to root
-  res* r = parse_config(CONFIG_FILE);
+  // IMPORTANT: change this path to point to where the config file should really be
+  r = parse_config("/home/rickse2/Documents/csci49X/secure-port-reservation/sprd.conf");
+  // Step through list of reservations, binding to each port and storing the socket fd
+  // TODO: see if there's a nice way to reduce amount of duplicate code in this loop
+  // TODO: consider modifying sockList to additionally contain fields defining user and group permissions
+  memset(&sockList, 0, sizeof(sockList));
+  struct sockaddr_in sockInfo;
+  while (r != NULL) {
+    range_node* ports = r->port_head;
+    while (ports != NULL) {
+        // Bind to first port in range
+        int portNum = ports->range[0];
+        // TODO: double check that this range makes sense
+        if (portNum > 0 && portNum < NUM_PORTS) {
+            memset(&sockInfo, 0, sizeof(sockInfo));
+            sockInfo.sin_family = AF_INET;
+            sockInfo.sin_port = htons(portNum);
+            if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+                // call to socket() failed
+                syslog(LOG_ALERT, "Unable to acquire a file descriptor for port %d", portNum);
+                syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
+            } else if (bind(fd, (struct sockaddr *)&sockInfo, sizeof(sockInfo)) < 0) {
+                // call to bind() failed
+                syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
+            } else {
+                // successful bind - store socket in sockList
+                sockList[portNum][1] = fd;
+            }
+        } else {
+            // Not a valid port number
+            syslog(LOG_WARNING, "Invalid port number: %d", portNum);
+        }
+        for (i = portNum+1; i <= ports->range[1]; i++) {
+            portNum = i;
+            if (portNum > 0 && portNum < NUM_PORTS) {
+                memset(&sockInfo, 0, sizeof(sockInfo));
+                sockInfo.sin_family = AF_INET;
+                sockInfo.sin_port = htons(portNum);
+                if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+                    // call to socket() failed
+                    syslog(LOG_ALERT, "Unable to acquire a file descriptor for port %d", portNum);
+                    syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
+                } else if (bind(fd, (struct sockaddr *)&sockInfo, sizeof(sockInfo)) < 0) {
+                    // call to bind() failed
+                    syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
+                } else {
+                    // successful bind - store socket in sockList
+                    sockList[portNum][1] = fd;
+                }
+            } else {
+                // Not a valid port number
+                syslog(LOG_WARNING, "Invalid port number: %d", portNum);
+            }
+        }
+        ports = ports->next;
+    }
+    r = r->next;
+  }
 
   // Unlink named fifo
   if (unlink(NAMED_FIFO) < 0) {
@@ -226,7 +285,7 @@ int handleExistingConnection (int uds, char *portBuf) {
     return RETURN_FAILURE;
   }
 
-  syslog(LOG_INFO, "Passed socket with port %d to uid: %ld gid: %ld", atoi(portBuf), (long)realCred->uid, (long)realCred->gid); 
+  syslog(LOG_INFO, "Passed socket with port %d to uid: %ld gid: %ld", atoi(portBuf), (long)realCred->uid, (long)realCred->gid);
 
   /* Credentials match and port not open */
 
@@ -237,7 +296,7 @@ int handleExistingConnection (int uds, char *portBuf) {
 
   syslog(LOG_NOTICE, "Port %d not authorized for user uid: %ld gid: %ld", atoi(portBuf), (long)realCred->uid, (long)realCred->gid);
   return RETURN_FAILURE;
-  
+
 
   return RETURN_SUCCESS;
 
