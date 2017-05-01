@@ -29,8 +29,16 @@
 #define RETURN_FAILURE -1
 #define PORT_DIGIT_MAX 5
 #define NUM_PORTS 65536
+#define LOWER_PORT_LIMIT 1023
 #define NAMED_FIFO "~/tmp/spr_fifo"
 #define CONFIG_FILE "sprd.conf"
+
+typedef struct reservation {
+    int inUse; // 1 if port is currently being securely bound to by another process; 0 otherwise
+    int fd;    // fd for the socket created when the daemon bound to this port
+    range_node* uid_head;
+    range_node* gid_head;
+} reservation;
 
 int handleNewConnection (int namedFifo, fd_set *active_fdset);
 int handleExistingConnection (int uds, char *portBuf);
@@ -41,7 +49,7 @@ int main () {
   pid_t pid, sid;
   fd_set active_fdset, read_fdset;
   char portBuf[PORT_DIGIT_MAX + 1];
-  int sockList[NUM_PORTS][2]; // sockList[portNum][0] --> inUse, sockList[portNum][1] --> fd for socket
+  reservation resList[NUM_PORTS]; // defines a reservation per port; index is equivalent to port number
   res* r;
 
   // Fork off of the parent process
@@ -94,16 +102,15 @@ int main () {
   r = parse_config("/home/rickse2/Documents/csci49X/secure-port-reservation/sprd.conf");
   // Step through list of reservations, binding to each port and storing the socket fd
   // TODO: see if there's a nice way to reduce amount of duplicate code in this loop
-  // TODO: consider modifying sockList to additionally contain fields defining user and group permissions
-  memset(&sockList, 0, sizeof(sockList));
+  memset(&resList, 0, sizeof(resList));
   struct sockaddr_in sockInfo;
   while (r != NULL) {
     range_node* ports = r->port_head;
     while (ports != NULL) {
         // Bind to first port in range
         int portNum = ports->range[0];
-        // TODO: double check that this range makes sense
-        if (portNum > 0 && portNum < NUM_PORTS) {
+        // TODO: make system call to get lower port number
+        if (portNum > LOWER_PORT_LIMIT && portNum < NUM_PORTS) {
             memset(&sockInfo, 0, sizeof(sockInfo));
             sockInfo.sin_family = AF_INET;
             sockInfo.sin_port = htons(portNum);
@@ -115,8 +122,10 @@ int main () {
                 // call to bind() failed
                 syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
             } else {
-                // successful bind - store socket in sockList
-                sockList[portNum][1] = fd;
+                // successful bind - store socket, valid uids and gids in resList
+                resList[portNum].fd = fd;
+                resList[portNum].uid_head = r->uid_head;
+                resList[portNum].gid_head = r->gid_head;
             }
         } else {
             // Not a valid port number
@@ -124,7 +133,7 @@ int main () {
         }
         for (i = portNum+1; i <= ports->range[1]; i++) {
             portNum = i;
-            if (portNum > 0 && portNum < NUM_PORTS) {
+            if (portNum > LOWER_PORT_LIMIT && portNum < NUM_PORTS) {
                 memset(&sockInfo, 0, sizeof(sockInfo));
                 sockInfo.sin_family = AF_INET;
                 sockInfo.sin_port = htons(portNum);
@@ -136,8 +145,10 @@ int main () {
                     // call to bind() failed
                     syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
                 } else {
-                    // successful bind - store socket in sockList
-                    sockList[portNum][1] = fd;
+                    // successful bind - store socket, valid uids and gids in resList
+                    resList[portNum].fd = fd;
+                    resList[portNum].uid_head = r->uid_head;
+                    resList[portNum].gid_head = r->gid_head;
                 }
             } else {
                 // Not a valid port number
