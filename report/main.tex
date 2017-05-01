@@ -1,0 +1,62 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% This is the template for submission to ISCA 2016
+% The cls file is a modified from  'sig-alternate.cls'
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass{sig-alternate} 
+\usepackage{mathptmx} % This is Times font
+
+\newcommand{\ignore}[1]{}
+\usepackage{fancyhdr}
+\usepackage[normalem]{ulem}
+\usepackage[hyphens]{url}
+\usepackage{hyperref}
+
+
+%%%%%%%%%%%---SETME-----%%%%%%%%%%%%%
+\newcommand{\hpcasubmissionnumber}{1}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\fancypagestyle{firstpage}{
+  \fancyhf{}
+\setlength{\headheight}{50pt}
+\renewcommand{\headrulewidth}{0pt}
+  \fancyhead[C]{\normalsize{ISCA 2017 Submission}} 
+  \pagenumbering{arabic}
+}  
+
+%%%%%%%%%%%---SETME-----%%%%%%%%%%%%%
+\title{Portcullis : Secure TCP/IP Port Reservation} 
+\author{Benjamin Ellerby, Raymond Weiming Luo, Evan Ricks, Oliver Smith-Denny}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+\maketitle
+\thispagestyle{firstpage}
+\pagestyle{plain}
+
+%TODO Brief overview of problem and our approach
+\begin{abstract}
+
+\end{abstract}
+
+%TODO Closer look at problem, and it's significance
+\section{Introduction}
+
+%TODO Why current solutions are inefficient
+\section{Related Work}
+
+%TODO Our stuff =
+\section{Solution}
+
+%TODO Relevance, future work, etc...
+\section{Conslusion}
+
+%%%%%%% -- PAPER CONTENT ENDS -- %%%%%%%%
+
+%%%%%%%%% -- BIB STYLE AND FILE -- %%%%%%%%
+\bibliographystyle{ieeetr}
+\bibliography{ref}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\end{document}
