@@ -40,16 +40,25 @@ typedef struct reservation {
     range_node* gid_head;
 } reservation;
 
+/* Associates uds with a port for closing */
+typedef struct udsAssoc {
+
+  int uds;
+  int port;
+
+} udsToPortList;
+
 int handleNewConnection (int namedFifo, fd_set *active_fdset);
-int handleExistingConnection (int uds, char *portBuf);
+int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, udsToPortList *udsTable, reservation *resList);
 
 int main () {
 
-  int i, namedFifo, fd;
+  int i, namedFifo, fd, udsTableIndex;
   pid_t pid, sid;
   fd_set active_fdset, read_fdset;
   char portBuf[PORT_DIGIT_MAX + 1];
   reservation resList[NUM_PORTS]; // defines a reservation per port; index is equivalent to port number
+  udsToPortList udsTable[NUM_PORTS];
   res* r;
 
   // Fork off of the parent process
@@ -91,6 +100,10 @@ int main () {
 
   // Zero active file descriptors for select
   FD_ZERO(&active_fdset);
+
+  // Clear udsTable
+  memset(udsTable, 0, NUM_PORTS * sizeof(udsToPortList));
+  udsTableIndex = 0;
 
   // Close the standard file descriptors
   close(STDIN_FILENO);
@@ -194,15 +207,19 @@ int main () {
               syslog(LOG_ERR, "Failed to recieve data from file descriptor %d", i);
 	          break;
 	        } else if (strlen(portBuf) == 0) {
-	          /* This is the case of secure_close, i can be shutdown and FD_CLR'ed from active_fdset */
-                if (shutdown(i, SHUT_RDWR) < 0) {
-                    syslog(LOG_CRIT, "Failed to shut down the file descriptor %d", i);
+	          /* This is the case of secure_close, i can be closed and FD_CLR'ed from active_fdset */
+
+		  // Ray -- note to check through udsTable (udsTableIndex is the max index currently) for i == uds, grab port num
+		  // delete that entry in the udsTable and subtract udsTableIndex by 1, use port num to access resList, mark port as not in use
+		  
+                if (close(i) < 0) {
+                    syslog(LOG_CRIT, "Failed to close the file descriptor %d", i);
                 }
 
                 FD_CLR(i, &active_fdset);
 	        } else {
 	          /* This is the case of secure_bind */
-	          if((handleExistingConnection(i, portBuf)) < 0) {
+	          if((handleExistingConnection(i, portBuf, &udsTableIndex, udsTable, resList)) < 0) {
 		    FD_CLR(i, &active_fdset);
 		    if((close(i)) < 0) {
 		      syslog(LOG_CRIT, "Failed to shut down the file descriptor %d", i);
@@ -221,7 +238,7 @@ int main () {
 
 /* Function to handle a request on a unix domain socket, return 0 on success, -1 on failure */
 
-int handleExistingConnection (int uds, char *portBuf) {
+int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, udsToPortList *udsTable, reservation *resList) {
 
   struct msghdr credMsg, fdMsg;
   struct cmsghdr *passCred, *cmsg;
@@ -233,6 +250,7 @@ int handleExistingConnection (int uds, char *portBuf) {
   int passFDData = 1;
   int flag = 1;
   int fd = 0;
+  int port = 0;
 
   memset(&credMsg, 0, sizeof(credMsg));
   memset(cDataBuf, 0, sizeof(cDataBuf));
@@ -272,42 +290,76 @@ int handleExistingConnection (int uds, char *portBuf) {
     return RETURN_FAILURE;
   }
 
-  //TODO: check data structure add in if statements below
+  /* Check if port access allowed and port available */
 
-  /* Credentials match and port open */
+  /* Port not reserved with daemon */
 
-  memset(&fdMsg, 0, sizeof(fdMsg));
-  memset(cmsgbuf, 0, sizeof(cmsgbuf));
-  fdMsg.msg_control = cmsgbuf;
-  fdMsg.msg_controllen = sizeof(cmsgbuf);
-  cmsg = CMSG_FIRSTHDR(&fdMsg);
-  cmsg->cmsg_level = SOL_SOCKET;
-  cmsg->cmsg_type = SCM_RIGHTS;
-  cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-  memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
-  fdMsg.msg_controllen = cmsg->cmsg_len;
-  fdMsg.msg_iov = &tempData;
-  fdMsg.msg_iovlen = 1;
-  tempData.iov_base = &passFDData;
-  tempData.iov_len = sizeof(int);
+  port = atoi(portBuf);
+  
+  if(&resList[port] == NULL) {
 
-  if((sendmsg(uds, &fdMsg, 0)) < 0) {
-    syslog(LOG_CRIT, "Could not send socket");
+    syslog(LOG_NOTICE, "Port %d not reserved with daemon", atoi(portBuf));
     return RETURN_FAILURE;
+    
   }
 
-  syslog(LOG_INFO, "Passed socket with port %d to uid: %ld gid: %ld", atoi(portBuf), (long)realCred->uid, (long)realCred->gid);
+  if(!(is_in_range(resList[port].uid_head, (int)realCred->uid) || is_in_range(resList[port].gid_head, (int)realCred->gid))) {
 
-  /* Credentials match and port not open */
+    /* Credentials do not match */
 
-  syslog(LOG_INFO, "Port %d already in use", atoi(portBuf));
-  return RETURN_FAILURE;
+    syslog(LOG_NOTICE, "Port %d not authorized for user uid: %ld gid: %ld", port, (long)realCred->uid, (long)realCred->gid);
+    return RETURN_FAILURE;
 
-  /* Credentials do not match */
+  } else if (!resList[port].inUse) {
 
-  syslog(LOG_NOTICE, "Port %d not authorized for user uid: %ld gid: %ld", atoi(portBuf), (long)realCred->uid, (long)realCred->gid);
-  return RETURN_FAILURE;
+    /* Credentials match and port open */
 
+    fd = resList[port].fd;
+
+    memset(&fdMsg, 0, sizeof(fdMsg));
+    memset(cmsgbuf, 0, sizeof(cmsgbuf));
+    fdMsg.msg_control = cmsgbuf;
+    fdMsg.msg_controllen = sizeof(cmsgbuf);
+    cmsg = CMSG_FIRSTHDR(&fdMsg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
+    fdMsg.msg_controllen = cmsg->cmsg_len;
+    fdMsg.msg_iov = &tempData;
+    fdMsg.msg_iovlen = 1;
+    tempData.iov_base = &passFDData;
+    tempData.iov_len = sizeof(int);
+
+    if((sendmsg(uds, &fdMsg, 0)) < 0) {
+      syslog(LOG_CRIT, "Could not send socket");
+      return RETURN_FAILURE;
+    }
+
+    /* Add to reserved list */
+
+    udsToPortList newAssoc;
+
+    memset((void *)&newAssoc, 0, sizeof(udsToPortList));
+
+    newAssoc.uds = uds;
+    newAssoc.port = atoi(portBuf);
+    
+    (*udsTableIndex)++;
+    udsTable[*udsTableIndex] = newAssoc;
+
+    resList[port].inUse = 1;
+
+    syslog(LOG_INFO, "Passed socket with port %d to uid: %ld gid: %ld", port, (long)realCred->uid, (long)realCred->gid);
+
+  } else {
+
+    /* Credentials match and port not open */
+
+    syslog(LOG_INFO, "Port %d already in use", port);
+    return RETURN_FAILURE;
+
+  }
 
   return RETURN_SUCCESS;
 
