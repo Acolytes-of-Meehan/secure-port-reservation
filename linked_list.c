@@ -11,11 +11,11 @@
 #define RETURN_FAILURE -1
 #define RETURN_SUCCESS 0
 
-list_node * make_linked_list (void *listItem) {
+list_node * make_linked_list () {
 
   list_node *new_list = calloc(1, sizeof(list_node));
 
-  new_list->listItem = listItem;
+  new_list->listItem = NULL;
   new_list->next = NULL;
 
   return new_list;

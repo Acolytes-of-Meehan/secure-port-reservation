@@ -24,6 +24,7 @@
 #include <string.h>
 #include <syslog.h>
 #include "parse_config.h"
+#include "linked_list.h"
 
 #define RETURN_SUCCESS 0
 #define RETURN_FAILURE -1
@@ -53,12 +54,12 @@ int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, udsToP
 
 int main () {
 
-  int i, namedFifo, fd, udsTableIndex;
+  int i, namedFifo, fd;
   pid_t pid, sid;
   fd_set active_fdset, read_fdset;
   char portBuf[PORT_DIGIT_MAX + 1];
   reservation resList[NUM_PORTS]; // defines a reservation per port; index is equivalent to port number
-  udsToPortList udsTable[NUM_PORTS];
+  list_node udsList;
   res* r;
 
   // Fork off of the parent process
@@ -196,6 +197,9 @@ int main () {
     }
   }
 
+  /* Create linked list to manage handed out sockets */
+  udsList = make_linked_list();
+
   // Use chmod(2) for:
   // WRITE: S_IWUSR (for current testing only), S_IWOTH and S_IWGRP
   // READ: S_IRUSR
@@ -258,7 +262,7 @@ int main () {
 
 /* Function to handle a request on a unix domain socket, return 0 on success, 
  * -1 on failure */
-int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, udsToPortList *udsTable, reservation *resList) {
+int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, list_node *udsList, reservation *resList) {
 
   struct msghdr credMsg, fdMsg;
   struct cmsghdr *passCred, *cmsg;
@@ -366,8 +370,7 @@ int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, udsToP
     newAssoc.uds = uds;
     newAssoc.port = atoi(portBuf);
     
-    (*udsTableIndex)++;
-    udsTable[*udsTableIndex] = newAssoc;
+    add_to_list(&newAssoc, udsList);
 
     resList[port].inUse = 1;
 
