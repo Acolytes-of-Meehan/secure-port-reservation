@@ -50,7 +50,8 @@ typedef struct udsAssoc {
 } udsToPortList;
 
 int handleNewConnection (int namedFifo, fd_set *active_fdset);
-int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, udsToPortList *udsTable, reservation *resList);
+int handleExistingConnection (int uds, char *portBuf, list_node *udsList, reservation *resList);
+void setFree (int uds, list_node * udsList, reservation *resList);
 
 int main () {
 
@@ -59,7 +60,7 @@ int main () {
   fd_set active_fdset, read_fdset;
   char portBuf[PORT_DIGIT_MAX + 1];
   reservation resList[NUM_PORTS]; // defines a reservation per port; index is equivalent to port number
-  list_node udsList;
+  list_node *udsList;
   res* r;
 
   // Fork off of the parent process
@@ -102,10 +103,6 @@ int main () {
 
   // Zero active file descriptors for select
   FD_ZERO(&active_fdset);
-
-  // Clear udsTable
-  memset(udsTable, 0, NUM_PORTS * sizeof(udsToPortList));
-  udsTableIndex = 0;
 
   // Close the standard file descriptors
   close(STDIN_FILENO);
@@ -230,26 +227,26 @@ int main () {
 	        memset(portBuf, 0, sizeof(portBuf));
 
 	        if ((recv(i, portBuf, PORT_DIGIT_MAX, MSG_PEEK)) < 0) {
-              syslog(LOG_ERR, "Failed to recieve data from file descriptor %d", i);
+		  syslog(LOG_ERR, "Failed to recieve data from file descriptor %d", i);
 	          break;
-	        } 
-            else if (strlen(portBuf) == 0) {
+	        } else if (strlen(portBuf) == 0) {
 	          /* This is the case of secure_close, i can be closed 
-               * and FD_CLR'ed from active_fdset. */
-                if (close(i) < 0) {
-                    syslog(LOG_CRIT, "Failed to close the file descriptor %d", i);
-                }
+		   * and FD_CLR'ed from active_fdset. */
 
-                FD_CLR(i, &active_fdset);
-	        } else {
-	          /* This is the case of secure_bind */
-	          if((handleExistingConnection(i, portBuf, &udsTableIndex, 
-                                           udsTable, resList)) < 0) {
-		        FD_CLR(i, &active_fdset);
-		        if((close(i)) < 0) {
-		          syslog(LOG_CRIT, "Failed to shut down the file descriptor %d", i);
-		        }
-		      }
+		  setFree(i, udsList, resList);
+		  if (close(i) < 0) {
+		    syslog(LOG_CRIT, "Failed to close the file descriptor %d", i);
+		  }
+
+		  FD_CLR(i, &active_fdset);
+		} else {
+		  /* This is the case of secure_bind */
+		  if((handleExistingConnection(i, portBuf, udsList, resList)) < 0) {
+		    FD_CLR(i, &active_fdset);
+		    if((close(i)) < 0) {
+		      syslog(LOG_CRIT, "Failed to shut down the file descriptor %d", i);
+		    }
+		  }
 	        }
           }
 	    }
@@ -260,9 +257,64 @@ int main () {
   }
 }
 
+/* Delete an association between uds and portNum and mark the port as free */
+void setFree (int uds, list_node *udsList, reservation *resList) {
+
+  list_node *curr = udsList;
+  udsToPortList *currentItem;
+  int position = 0;
+
+  /* Go through association list to find proper association */
+  while (curr->next != NULL) {
+
+    /* Get association */
+    currentItem = (udsToPortList *)curr->listItem;
+
+    /* Check if the uds matches */
+    if (uds == currentItem->uds) {
+
+      /* If so, shutdown socket, report error if it did not work */
+      if ((shutdown(resList[currentItem->port].fd, SHUT_RDWR)) < 0) {
+
+	syslog(LOG_CRIT, "Could not shutdown connections to socket on port %d", currentItem->port);
+
+      }
+
+      /* Mark the port as available */
+      resList[currentItem->port].inUse = 0;
+
+      /* Remove now defunct association */
+      remove_from_list(position, curr, udsList);
+
+    }
+
+    position++;
+    curr = curr->next;
+
+  }
+  
+  /* Last element is not checked in while loop, so must be checked outside of it */
+  currentItem = (udsToPortList *)curr->listItem;
+
+  if (uds == currentItem->uds) {
+
+    if ((shutdown(resList[currentItem->port].fd, SHUT_RDWR)) < 0) {
+
+      syslog(LOG_CRIT, "Could not shutdown connections to socket on port %d", currentItem->port);
+
+    }
+
+    resList[currentItem->port].inUse = 0;
+      
+    remove_from_list(position, curr, udsList);
+
+  }
+
+}
+
 /* Function to handle a request on a unix domain socket, return 0 on success, 
  * -1 on failure */
-int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, list_node *udsList, reservation *resList) {
+int handleExistingConnection (int uds, char *portBuf, list_node *udsList, reservation *resList) {
 
   struct msghdr credMsg, fdMsg;
   struct cmsghdr *passCred, *cmsg;
@@ -315,10 +367,9 @@ int handleExistingConnection (int uds, char *portBuf, int *udsTableIndex, list_n
   }
 
   /* Check if port access allowed and port available */
+  port = atoi(portBuf);
 
   /* Port not reserved with daemon */
-
-  port = atoi(portBuf);
   
   if(&resList[port] == NULL) {
 
