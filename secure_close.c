@@ -16,6 +16,6 @@
 #include "spr.h"
 #include <unistd.h>
 
-int secure_close (int recvSock, int udsListen, int udsConnect) {
-    return (close(udsConnect) | close(udsListen) | close(recvSock));
+int secure_close (sprFDSet *closeSet) {
+    return (close(closeSet->udsConnect) | close(closeSet->udsListen) | close(closeSet->recvSock));
 }

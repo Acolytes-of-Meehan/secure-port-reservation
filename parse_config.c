@@ -16,7 +16,7 @@ int is_in_range(range_node* node, int val) {
 }
 
 res* parse_config(char* path) {
-    int status;
+  //int status;
     FILE* conf = fopen(path, "r");
     // can read file
     res* head = NULL;

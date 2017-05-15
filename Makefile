@@ -1,13 +1,16 @@
 cc = gcc
 cflags = -Wall
-execs = myUDS sprd
+execs = myUDS sprd finalRequester
 all : daemon
 
 daemon : sprd.o parse_config.o linked_list.o
-	gcc sprd.o parse_config.o tokenizer.o linked_list.o -o sprd
+	$(cc) $(cflags) sprd.o parse_config.o tokenizer.o linked_list.o -o sprd
 
 parse_config.o : parse_config.c
-	gcc parse_config.c tokenizer.c -c #-o parse_config
+	$(cc) $(cflags) parse_config.c tokenizer.c -c #-o parse_config
+
+socktest : finalRequester.o daemon secure_bind.o secure_close.o
+	$(cc) $(cflags) $< secure_bind.o secure_close.o -o finalRequester
 
 %.o : %.c
 	$(cc) $(cflags) -c -g $<
