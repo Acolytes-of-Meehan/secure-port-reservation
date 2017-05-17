@@ -2,13 +2,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
-#include <time.h>
 #include "spr.h"
 
 int main (int argc, char **argv) {
@@ -18,21 +16,13 @@ int main (int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
   
-  int port = atoi(argv[1]
-		  );
-  char uds[PATH_MAX];
-  time_t t;
+  int port = atoi(argv[1]);
   int mySocket;
   sprFDSet reservedPort;
-  memset(uds, 0, PATH_MAX);
-  strcpy(uds, "proc");
-  srand((unsigned)time(&t));
-
-  sprintf(&uds[4], "%dr%d", getpid(), rand() % 100);
 
   printf("Ready to secure_bind\n");
 
-  if ((secure_bind(port, uds, &reservedPort)) < 0) {
+  if ((secure_bind(port, &reservedPort)) < 0) {
     fprintf(stderr, "secure_bind returned with errno: %d\n", errno);
     exit(EXIT_FAILURE);
   }

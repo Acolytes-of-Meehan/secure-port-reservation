@@ -41,7 +41,7 @@ typedef struct sprFDSocks {
 
 } sprFDSet;
 
-int secure_bind __P((int portNum, char *udsName, sprFDSet *returnSet));
+int secure_bind __P((int portNum, sprFDSet *returnSet));
 int secure_close __P((sprFDSet *closeSet));
 
 __END_DECLS

@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <time.h>
 
 #define PORT_MIN 0
 #define PORT_MAX 65535
@@ -33,14 +34,15 @@
 #define RETURN_SUCCESS 0
 #define NAMED_FIFO "/tmp/spr_fifo"
 
-int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
+int secure_bind(int portNum, sprFDSet *returnSet){
 
   int recvFD, udsConnectSock, udsListenSock, localLen, remoteLen, flag, fifo;
+  time_t seedTime;
   struct sockaddr_un local, remote;
   struct msghdr daemonPermissions, recvFDMsg;
   struct cmsghdr *daemonControl, *recvFDControl;
   struct iovec junkData, fdJunk;
-  char cmsgbuf[CMSG_SPACE(sizeof(int))], portBuf[PORT_DIGITS], junkBase, fdBase;
+  char cmsgbuf[CMSG_SPACE(sizeof(int))], portBuf[PORT_DIGITS], junkBase, fdBase, udsPath[PATH_MAX + 1];
   /* Begin BSD incompatible */
   char cDataBuf[CMSG_SPACE(sizeof(struct ucred))];
   struct ucred dCred;
@@ -68,6 +70,7 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
   memset((void *)cmsgbuf, 0, sizeof(cmsgbuf));
   memset((void *)&junkData, 0, sizeof(junkData));
   memset((void *)&fdJunk, 0, sizeof(fdJunk));
+  memset((void *)udsPath, 0, PATH_MAX + 1);
 
   fdBase = '3';
 
@@ -77,6 +80,9 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
   recvFDMsg.msg_iovlen = 1;
   fdJunk.iov_base = &fdBase;
   fdJunk.iov_len = sizeof(fdBase);
+
+  srand((unsigned)time(&seedTime));
+  snprintf(udsPath, PATH_MAX, "/tmp/proc%dr%d", getpid(), rand() % 100);
 
   if((udsListenSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
     return RETURN_FAILURE;
@@ -100,13 +106,15 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
   /* Write the pathname of the UDS Sock to the Daemon's named FIFO */
 
-  if((fifo = open(NAMED_FIFO, O_WRONLY | O_NONBLOCK)) < 0) {
+  if((fifo = open(NAMED_FIFO, O_WRONLY)) < 0) {
     return RETURN_FAILURE;
   }
 
   if((write(fifo, udsPath, strlen(udsPath))) < strlen(udsPath)) {
     return RETURN_FAILURE;
   }
+
+  close(fifo);
 
   /* Receive credentials from the Daemon and verify them (recvmsg) */
 

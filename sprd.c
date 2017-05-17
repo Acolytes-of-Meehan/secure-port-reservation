@@ -50,7 +50,7 @@ typedef struct udsAssoc {
 
 } udsToPortList;
 
-int handleNewConnection (int namedFifo, fd_set *active_fdset);
+int handleNewConnection (int namedFifo, char *readBuf, fd_set *active_fdset);
 int handleExistingConnection (int uds, char *portBuf, list_node *udsList, reservation *resList);
 void setFree (int uds, list_node * udsList, reservation *resList);
 
@@ -59,7 +59,7 @@ int main () {
   int i, namedFifo, fd;
   pid_t pid, sid;
   fd_set active_fdset, read_fdset;
-  char portBuf[PORT_DIGIT_MAX + 1];
+  char portBuf[PORT_DIGIT_MAX + 1], readBuf[PATH_MAX + 1];
   reservation resList[NUM_PORTS]; // defines a reservation per port; index is equivalent to port number
   list_node *udsList;
   res* r;
@@ -207,22 +207,29 @@ int main () {
     exit(EXIT_FAILURE);
   }
 
-  if ((namedFifo = open(NAMED_FIFO, O_RDONLY | O_NOCTTY | O_NONBLOCK))) {
+  if ((namedFifo = open(NAMED_FIFO, O_RDONLY | O_NOCTTY | O_NONBLOCK)) < 0) {
     syslog(LOG_CRIT, "Failed to open named fifo '%s'", NAMED_FIFO);
     exit(EXIT_FAILURE);
   }
 
+  FD_SET(namedFifo, &active_fdset);
+
   while(1) {
     // TODO: Get uds socket then FD_SET the uds socket into the active_fset
     read_fdset = active_fdset;
-    if (select (FD_SETSIZE, &read_fdset, NULL, NULL, NULL) == 0) {
+    if ((select (FD_SETSIZE, &read_fdset, NULL, NULL, NULL)) > 0) {
       for (i = 0; i < FD_SETSIZE; i++) {
 	    if (FD_ISSET(i, &read_fdset)) {
           if (i == namedFifo) {
 	        /* Run secure_bind interface, read uds name from named fifo, try 
              * to connect to that uds */
-	        handleNewConnection(namedFifo, &active_fdset);
-	      }
+	    memset(readBuf, 0, sizeof(readBuf));
+	    if((read(namedFifo, readBuf, PATH_MAX)) == 0) {
+	      syslog(LOG_NOTICE, "No data read from named FIFO");
+	    } else if (strlen(readBuf) != 0) {
+	      handleNewConnection(namedFifo, readBuf, &active_fdset);
+	    }
+	  }
 
           /* This is the case where it is not the named fifo, so it is one 
            * of possibly many ud sockets. Need to check what was sent across, 
@@ -447,20 +454,13 @@ int handleExistingConnection (int uds, char *portBuf, list_node *udsList, reserv
 
 /* Function to handle a request on the named FIFO, returns 0 on success, -1 on failure */
 
-int handleNewConnection (int namedFifo, fd_set *active_fdset) {
+int handleNewConnection (int namedFifo, char *readBuf, fd_set *active_fdset) {
 
-  char readBuf[PATH_MAX + 1];
   char sendChar = 'd';
   struct sockaddr_un remote;
   int len, connectSock;
 
-  memset(readBuf, 0, sizeof(readBuf));
   memset(&remote, 0, sizeof(remote));
-
-  if((read(namedFifo, readBuf, PATH_MAX)) == 0) {
-    syslog(LOG_NOTICE, "No data read from named FIFO");
-    return RETURN_FAILURE;
-  }
 
   if((connectSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
     syslog(LOG_CRIT, "Could not open a unix domain socket");
