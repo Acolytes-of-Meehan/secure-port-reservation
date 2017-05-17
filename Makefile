@@ -18,3 +18,5 @@ socktest : finalRequester.o daemon secure_bind.o secure_close.o
 clean :
 	$(RM) *.o , *.gch , *~ , *#
 	$(RM) $(execs)
+	$(RM) /tmp/proc*
+
