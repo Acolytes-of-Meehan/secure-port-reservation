@@ -215,7 +215,6 @@ int main () {
   FD_SET(namedFifo, &active_fdset);
 
   while(1) {
-    // TODO: Get uds socket then FD_SET the uds socket into the active_fset
     read_fdset = active_fdset;
     if ((select (FD_SETSIZE, &read_fdset, NULL, NULL, NULL)) > 0) {
       for (i = 0; i < FD_SETSIZE; i++) {
