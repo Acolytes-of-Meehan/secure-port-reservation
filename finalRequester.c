@@ -14,7 +14,8 @@
 int main (int argc, char **argv) {
 
   if (argc < 2) {
-    printf("Usage: ./testRequest portNum");
+    printf("Usage: ./testRequest portNum\n");
+    exit(EXIT_FAILURE);
   }
   
   int port = atoi(argv[1]
@@ -29,10 +30,14 @@ int main (int argc, char **argv) {
 
   sprintf(&uds[4], "%dr%d", getpid(), rand() % 100);
 
+  printf("Ready to secure_bind\n");
+
   if ((secure_bind(port, uds, &reservedPort)) < 0) {
     fprintf(stderr, "secure_bind returned with errno: %d\n", errno);
     exit(EXIT_FAILURE);
   }
+
+  printf("Ready to listen\n");
 
   if ((listen(reservedPort.recvSock, 5)) < 0) {
     fprintf(stderr, "listen errno: %d\n", errno);
@@ -40,6 +45,8 @@ int main (int argc, char **argv) {
 
   struct sockaddr_in peer;
   socklen_t len = sizeof(peer);
+
+  printf("Ready to accept\n");
   
   if ((mySocket = accept(reservedPort.recvSock, (struct sockaddr *)&peer, &len)) < 0) {
     fprintf(stderr, "accept errno: %d\n", errno);

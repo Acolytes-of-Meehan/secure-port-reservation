@@ -31,7 +31,7 @@
 #define QLEN 5
 #define RETURN_FAILURE -1
 #define RETURN_SUCCESS 0
-#define NAMED_FIFO "~/tmp/spr_fifo"
+#define NAMED_FIFO "/tmp/spr_fifo"
 
 int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
@@ -100,7 +100,7 @@ int secure_bind(int portNum, char *udsPath, sprFDSet *returnSet){
 
   /* Write the pathname of the UDS Sock to the Daemon's named FIFO */
 
-  if((fifo = open(NAMED_FIFO, O_WRONLY)) < 0) {
+  if((fifo = open(NAMED_FIFO, O_WRONLY | O_NONBLOCK)) < 0) {
     return RETURN_FAILURE;
   }
 

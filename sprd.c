@@ -23,6 +23,7 @@
 #include <linux/limits.h>
 #include <string.h>
 #include <syslog.h>
+#include <fcntl.h>
 #include "parse_config.h"
 #include "linked_list.h"
 
@@ -31,7 +32,7 @@
 #define PORT_DIGIT_MAX 5
 #define NUM_PORTS 65536
 #define LOWER_PORT_LIMIT 1023
-#define NAMED_FIFO "~/tmp/spr_fifo"
+#define NAMED_FIFO "/tmp/spr_fifo"
 #define CONFIG_FILE "sprd.conf"
 
 typedef struct reservation {
@@ -111,7 +112,7 @@ int main () {
 
   // Parse config file to generate a linked list of reservations
   // IMPORTANT: change this path to point to where the config file should really be
-  r = parse_config("/home/rickse2/Documents/csci49X/secure-port-reservation/sprd.conf");
+  r = parse_config("/home/smithdo/CS493/secure-port-reservation/sprd.conf");
 
   // Step through list of reservations, binding to each port and storing the socket fd
   // TODO: see if there's a nice way to reduce amount of duplicate code in this loop
@@ -201,15 +202,19 @@ int main () {
   // WRITE: S_IWUSR (for current testing only), S_IWOTH and S_IWGRP
   // READ: S_IRUSR
   // TODO: Change to O_RDONLY after testing
-  if((namedFifo = mkfifo(NAMED_FIFO, S_IRUSR | S_IWUSR | S_IWGRP | S_IWOTH)) < 0) {
+  if((mkfifo(NAMED_FIFO, S_IRUSR | S_IWUSR | S_IWGRP | S_IWOTH)) < 0) {
     syslog(LOG_CRIT, "Failed to make the named fifo '%s'", NAMED_FIFO);
+    exit(EXIT_FAILURE);
+  }
+
+  if ((namedFifo = open(NAMED_FIFO, O_RDONLY | O_NOCTTY | O_NONBLOCK))) {
+    syslog(LOG_CRIT, "Failed to open named fifo '%s'", NAMED_FIFO);
     exit(EXIT_FAILURE);
   }
 
   while(1) {
     // TODO: Get uds socket then FD_SET the uds socket into the active_fset
     read_fdset = active_fdset;
-
     if (select (FD_SETSIZE, &read_fdset, NULL, NULL, NULL) == 0) {
       for (i = 0; i < FD_SETSIZE; i++) {
 	    if (FD_ISSET(i, &read_fdset)) {
