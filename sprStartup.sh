@@ -8,30 +8,33 @@
 #
 # Startup script to run the secure port reservation.
 
-echo "starting secure port reservation script..."
+echo "Starting secure port reservation script..."
 echo
 
-echo "compile files..."
-gcc -c -g spr.h
+################################################################
 
+echo "Compiling C program files..."
 for i in *.c
 do
     echo $i
     gcc -c -g -Wall $i
 done
 
-echo "compile done"
+echo "Compiling C program files... DONE."
 echo
 
-echo "run requester..."
-if [ -a requester ]
-    then
-        ./requester
-fi
-echo "requester done"
+################################################################
+
+echo -n "Creating daemon... "
+gcc -o -g -Wall sprd.o parse_config.o tokenizer.o linked_list.o -o sprd
+echo "DONE."
 echo
 
-echo "clean up..."
-rm -f sender , requester , uds , *.o , *.gch , *# , *~
-echo "cleaning done"
+################################################################
+
+echo -n "Creating socket test... "
+gcc -o -g -Wall finalRequester.o secure_bind.o secure_close.o -o finalRequester
+echo "DONE."
 echo
+
+################################################################
