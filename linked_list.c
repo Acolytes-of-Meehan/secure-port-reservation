@@ -30,14 +30,19 @@ int add_to_list (void *listItem, list_node *list) {
 
   list_node *curr = list;
 
-  while (curr->next != NULL)
-    curr = curr->next;
+  if (curr->listItem == NULL) {
+    curr->listItem = listItem;
+  } else {
 
-  list_node *new = calloc(1, sizeof(list_node));
-  new->next = NULL;
-  new->listItem = listItem;
+    while (curr->next != NULL)
+      curr = curr->next;
 
-  curr->next = new;
+    list_node *new = calloc(1, sizeof(list_node));
+    new->next = NULL;
+    new->listItem = listItem;
+
+    curr->next = new;
+  }
 
   return RETURN_SUCCESS;
 

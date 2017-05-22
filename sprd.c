@@ -207,7 +207,7 @@ int main () {
     exit(EXIT_FAILURE);
   }
 
-  if ((namedFifo = open(NAMED_FIFO, O_RDONLY | O_NOCTTY | O_NONBLOCK)) < 0) {
+  if ((namedFifo = open(NAMED_FIFO, O_RDWR | O_NOCTTY | O_NONBLOCK)) < 0) {
     syslog(LOG_CRIT, "Failed to open named fifo '%s'", NAMED_FIFO);
     exit(EXIT_FAILURE);
   }
