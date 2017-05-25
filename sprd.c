@@ -243,7 +243,9 @@ int main () {
 	        } else if (strlen(portBuf) == 0) {
 	          /* This is the case of secure_close, i can be closed 
 		   * and FD_CLR'ed from active_fdset. */
-
+		  if ((recv(i, portBuf, PORT_DIGIT_MAX, 0))) {
+		    syslog(LOG_NOTICE, "Failed to clear TCP buffer after closed uds %d", i);
+		  }
 		  setFree(i, udsList, resList);
 		  if (close(i) < 0) {
 		    syslog(LOG_CRIT, "Failed to close the file descriptor %d", i);
@@ -295,7 +297,10 @@ void setFree (int uds, list_node *udsList, reservation *resList) {
       resList[currentItem->port].inUse = 0;
 
       /* Remove now defunct association */
-      remove_from_list(position, curr, udsList);
+      free((udsToPortList *)curr->listItem);
+      if ((remove_from_list(position, curr, udsList)) < 0) {
+	udsList = make_linked_list();
+      }
 
     }
 
@@ -425,14 +430,12 @@ int handleExistingConnection (int uds, char *portBuf, list_node *udsList, reserv
 
     /* Add to reserved list */
 
-    udsToPortList newAssoc;
+    udsToPortList *newAssoc = calloc(1, sizeof(udsToPortList));
 
-    memset((void *)&newAssoc, 0, sizeof(udsToPortList));
-
-    newAssoc.uds = uds;
-    newAssoc.port = atoi(portBuf);
+    newAssoc->uds = uds;
+    newAssoc->port = atoi(portBuf);
     
-    add_to_list(&newAssoc, udsList);
+    add_to_list(newAssoc, udsList);
 
     resList[port].inUse = 1;
 
