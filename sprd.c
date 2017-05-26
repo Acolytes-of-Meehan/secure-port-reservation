@@ -118,7 +118,7 @@ int main () {
   // TODO: see if there's a nice way to reduce amount of duplicate code in this loop
   memset(&resList, 0, sizeof(resList));
   struct sockaddr_in sockInfo;
-  int sockFlag = 1;
+  //int sockFlag = 1;
 
   while (r != NULL) {
     range_node* ports = r->port_head;
@@ -144,7 +144,8 @@ int main () {
                 syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
             } else {
                 // successful bind - store socket, valid uids and gids in resList
-	      setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockFlag, sizeof(sockFlag));
+	      //setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockFlag, sizeof(sockFlag));
+	      //listen(fd, 5);
 	      resList[portNum].fd = fd;
 	      resList[portNum].uid_head = r->uid_head;
 	      resList[portNum].gid_head = r->gid_head;
@@ -174,7 +175,8 @@ int main () {
                     syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
                 } else {
                     // successful bind - store socket, valid uids and gids in resList
-		  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockFlag, sizeof(sockFlag));
+		  //setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockFlag, sizeof(sockFlag));
+		  //listen(fd, 5);
                     resList[portNum].fd = fd;
                     resList[portNum].uid_head = r->uid_head;
                     resList[portNum].gid_head = r->gid_head;
