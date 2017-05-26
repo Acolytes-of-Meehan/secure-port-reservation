@@ -143,9 +143,9 @@ int main () {
                 syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
             } else {
                 // successful bind - store socket, valid uids and gids in resList
-                resList[portNum].fd = fd;
-                resList[portNum].uid_head = r->uid_head;
-                resList[portNum].gid_head = r->gid_head;
+	      resList[portNum].fd = fd;
+	      resList[portNum].uid_head = r->uid_head;
+	      resList[portNum].gid_head = r->gid_head;
             }
         } else {
             // Not a valid port number

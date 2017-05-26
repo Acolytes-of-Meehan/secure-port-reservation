@@ -38,6 +38,7 @@ typedef struct sprFDSocks {
   int recvSock;
   int udsListen;
   int udsConnect;
+  char *udsLoc;
 
 } sprFDSet;
 

@@ -83,6 +83,8 @@ int secure_bind(int portNum, sprFDSet *returnSet){
 
   srand((unsigned)time(&seedTime));
   snprintf(udsPath, PATH_MAX, "/tmp/proc%dr%d", getpid(), rand() % 100);
+  returnSet->udsLoc = calloc(1, strlen(udsPath)+1);
+  strncpy(returnSet->udsLoc, udsPath, strlen(udsPath));
 
   if((udsListenSock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
     return RETURN_FAILURE;

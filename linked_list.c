@@ -51,7 +51,6 @@ int add_to_list (void *listItem, list_node *list) {
 int remove_from_list (int position, list_node *deleteNode, list_node *list) {
 
   if (list == NULL || position < 1 || deleteNode == NULL) {
-    free(deleteNode);
     return RETURN_FAILURE;
   }
 
@@ -74,9 +73,9 @@ int remove_from_list (int position, list_node *deleteNode, list_node *list) {
       curr->next->listItem = NULL;
       curr->next = curr->next->next;
     }
-  }
 
-  free(deleteNode);
+    free(deleteNode);
+  }
 
   return RETURN_SUCCESS;
 }

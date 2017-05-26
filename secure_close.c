@@ -15,7 +15,9 @@
 #define _GNU_SOURCE
 #include "spr.h"
 #include <unistd.h>
+#include <stdlib.h>
 
 int secure_close (sprFDSet *closeSet) {
-    return (close(closeSet->udsConnect) | close(closeSet->udsListen) | close(closeSet->recvSock));
+  unlink(closeSet->udsLoc);
+  return (close(closeSet->udsConnect) | close(closeSet->udsListen) | close(closeSet->recvSock));
 }
