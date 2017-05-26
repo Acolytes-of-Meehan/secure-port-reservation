@@ -118,6 +118,7 @@ int main () {
   // TODO: see if there's a nice way to reduce amount of duplicate code in this loop
   memset(&resList, 0, sizeof(resList));
   struct sockaddr_in sockInfo;
+  int sockFlag = 1;
 
   while (r != NULL) {
     range_node* ports = r->port_head;
@@ -143,6 +144,7 @@ int main () {
                 syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
             } else {
                 // successful bind - store socket, valid uids and gids in resList
+	      setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockFlag, sizeof(sockFlag));
 	      resList[portNum].fd = fd;
 	      resList[portNum].uid_head = r->uid_head;
 	      resList[portNum].gid_head = r->gid_head;
@@ -172,6 +174,7 @@ int main () {
                     syslog(LOG_ALERT, "Unable to reserve port %d", portNum);
                 } else {
                     // successful bind - store socket, valid uids and gids in resList
+		  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &sockFlag, sizeof(sockFlag));
                     resList[portNum].fd = fd;
                     resList[portNum].uid_head = r->uid_head;
                     resList[portNum].gid_head = r->gid_head;
@@ -287,11 +290,11 @@ void setFree (int uds, list_node *udsList, reservation *resList) {
     if (uds == currentItem->uds) {
 
       /* If so, shutdown socket, report error if it did not work */
-      if ((shutdown(resList[currentItem->port].fd, SHUT_RDWR)) < 0) {
+      /*if ((shutdown(resList[currentItem->port].fd, SHUT_RDWR)) < 0) {
 
 	syslog(LOG_CRIT, "Could not shutdown connections to socket on port %d", currentItem->port);
 
-      }
+      }*/
 
       /* Mark the port as available */
       resList[currentItem->port].inUse = 0;
