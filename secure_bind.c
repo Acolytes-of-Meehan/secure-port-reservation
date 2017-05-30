@@ -25,6 +25,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <time.h>
+#include <sys/stat.h>
 
 #define PORT_MIN 0
 #define PORT_MAX 65535
@@ -103,6 +104,8 @@ int secure_bind(int portNum, sprFDSet *returnSet){
   if((bind(udsListenSock, (struct sockaddr *)&local, localLen)) < 0)
     return RETURN_FAILURE;
 
+  chmod(udsPath, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP);
+  
   if((listen(udsListenSock, QLEN)) < 0)
     return RETURN_FAILURE;
 
