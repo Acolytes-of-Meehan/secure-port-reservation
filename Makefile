@@ -14,7 +14,7 @@ socktest : finalRequester.o daemon secure_bind.o secure_close.o
 
 install : daemon
 	mv sprd.conf /tmp
-
+	./sprd
 %.o : %.c
 	$(cc) $(cflags) -c -g $<
 
