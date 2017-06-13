@@ -112,7 +112,7 @@ int main () {
 
   // Parse config file to generate a linked list of reservations
   // IMPORTANT: change this path to point to where the config file should really be
-  r = parse_config("/home/smithdo/CS493/secure-port-reservation/sprd.conf");
+  r = parse_config("/tmp/sprd.conf");
 
   // Step through list of reservations, binding to each port and storing the socket fd
   // TODO: see if there's a nice way to reduce amount of duplicate code in this loop

@@ -12,6 +12,9 @@ parse_config.o : parse_config.c
 socktest : finalRequester.o daemon secure_bind.o secure_close.o
 	$(cc) $(cflags) $< secure_bind.o secure_close.o -o finalRequester
 
+install : daemon
+	mv sprd.conf /tmp
+
 %.o : %.c
 	$(cc) $(cflags) -c -g $<
 
